@@ -8,10 +8,13 @@ define((require) => {
     const PropertyEditor = require('properties/property-editor-component');
     const PropertyDocument = require('properties/property-document');
     const props = require('properties/property-editor-utils');
+    const mathUtils = require("common/math-utils")
 
     const Spinner = require('components/spinner');
+    const Button = require('components/button');
 
     const CameraTransformModel = require('./camera-transform-model');
+    const hostService = require("services/host-service")
     
     class CameraTransformApp {
         constructor(){
@@ -22,44 +25,60 @@ define((require) => {
          * Render the viewer with the camera transform.
          */
         render () {
-            // return PropertyEditor.component({document:            
-            //  new PropertyDocument([
-            //     props.category("Camera Transform", {isTransformLayout: true}, [
-            //         props.vector3("Position", m.prop([1,2,3]), {increment: 0.5}),
-            //         props.rotation("Rotation", m.prop([1,2,3]), {increment: 0.5})
-            //     ])
-            // ])});
-
-            return PropertyEditor.component({document: 
-            new PropertyDocument([
-                props.category("Camera Transform", {isTransformLayout: true}, [
-                    props.vector3("Position", [this.model.propertyModel('state.position.X'), this.model.propertyModel('state.position.Y'), this.model.propertyModel('state.position.Z')], {decimal: 5, increment: 0.5}),
-                    props.rotation("Rotation", [this.model.propertyModel('state.rotation.X'), this.model.propertyModel('state.rotation.Y'), this.model.propertyModel('state.rotation.Z')], {decimal: 5,increment: 0.5})
+            return m.layout.vertical({}, [
+                PropertyEditor.component({document: 
+                new PropertyDocument([
+                    props.category("Camera Transform", {flex: 'flex-33-66'}, [
+                        props.helpers.vector3("Position", [this.model.propertyModel('position.X'), this.model.propertyModel('position.Y'), this.model.propertyModel('position.Z')], {decimal: 10, increment: 0.5}),
+                        props.helpers.rotation("Rotation", [this.model.propertyModel('rotation.X'), this.model.propertyModel('rotation.Y'), this.model.propertyModel('rotation.Z')], {decimal: 3, increment: 0.5})
+                    ])
+                ])}),
+                m.layout.horizontal({}, [
+                    Button.component(this.createButton("Copy Camera Transform", () => this.sendCameraTransformToClipboard())),
+                    Button.component(this.createButton("Paste Camera Transform", () => this.setCameraTransformFromClipboard()))
                 ])
-            ])});
-
-            // return PropertyEditor.component({document:
-            //  new PropertyDocument([
-            //     props.category("Light baking options", {flex: 'flex-50-50'}, [
-            //         props.number("Position X", this.model.propertyModel('state.position.X'), {min: 0, max: 100, decimal: 5, increment: 1.0}),
-            //         props.number("Position Y", this.model.propertyModel('state.position.Y'), {min: 0, max: 100, decimal: 5, increment: 1.0}),
-            //         props.number("Position Z", this.model.propertyModel('state.position.Z'), {min: 0, max: 100, decimal: 5, increment: 1.0}),
-            //         props.number("Rotation X", this.model.propertyModel('state.rotation.X'), {min: 0, max: 100, decimal: 5, increment: 1.0}),
-            //         props.number("Rotation Y", this.model.propertyModel('state.rotation.Y'), {min: 0, max: 100, decimal: 5, increment: 1.0}),
-            //         props.number("Rotation Z", this.model.propertyModel('state.rotation.Z'), {min: 0, max: 100, decimal: 5, increment: 1.0}),
-            //     ])
-            // ])});
+            ]);
+        }
+        
+        createButton(text, onclick, disabled = false, classes, title) {
+            return {
+                onclick: onclick,
+                title: title ? title : text,
+                text: text,
+                class: classes,
+                disabled : disabled
+            };
         }
 
-        // getSpinerFor(modelProp){
-        //     return Spinner.component({
-        //         model: this.model.propertyModel(modelProp),
-        //         disabled: false,
-        //         increment: 0.1,
-        //         decimal: 4,
-        //         placeholder: ""
-        //     })
-        // }
+        sendCameraTransformToClipboard(){
+            let clipboardObj = {
+                position: {
+                    X: this.model.state.position.X,
+                    Y: this.model.state.position.Y,
+                    Z: this.model.state.position.Z
+                },
+                rotation: 
+                {
+                    X: this.model.state.rotation.X,
+                    Y: this.model.state.rotation.Y,
+                    Z: this.model.state.rotation.Z,
+                    W: this.model.state.rotation.W
+                }
+            };
+            return hostService.setClipboardTextData(JSON.stringify(clipboardObj));
+        }
+
+        setCameraTransformFromClipboard(){
+            return hostService.getClipboardTextData()
+            .then(clipboardObj => {
+                try{
+                    if(!clipboardObj.position || !clipboardObj.rotation) throw "Invalid Clipboard Object";
+                    this.model.pushFullState(clipboardObj).then(() => m.utils.redraw("Camera value updated"));
+                }catch(e){
+                    console.warn("The clipboard content is not a valid camera transform");
+                }
+            });
+        }
 
         /**
          * Entry point to compose view.
