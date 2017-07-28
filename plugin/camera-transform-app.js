@@ -16,6 +16,20 @@ define((require) => {
     const CameraTransformModel = require('./camera-transform-model');
     const hostService = require("services/host-service")
     
+    const DEFAULT_CAMERA_TRANSFORM = {
+        position:{
+            X: 0,
+            Y: 0,
+            Z: 0
+        },
+        rotation: {
+            X: 0,
+            Y: 0,
+            Z: 0,
+            W: 0
+        }
+    }
+
     class CameraTransformApp {
         constructor(){
             this.model = new CameraTransformModel();
@@ -30,12 +44,17 @@ define((require) => {
                 new PropertyDocument([
                     props.category("Camera Transform", {flex: 'flex-33-66'}, [
                         props.helpers.vector3("Position", [this.model.propertyModel('position.X'), this.model.propertyModel('position.Y'), this.model.propertyModel('position.Z')], {decimal: 10, increment: 0.5}),
-                        props.helpers.rotation("Rotation", [this.model.propertyModel('rotation.X'), this.model.propertyModel('rotation.Y'), this.model.propertyModel('rotation.Z')], {decimal: 3, increment: 0.5})
+                        props.helpers.rotation("Rotation", [this.model.propertyModel('rotationDegrees.X'), this.model.propertyModel('rotationDegrees.Y'), this.model.propertyModel('rotationDegrees.Z')], {decimal: 3, increment: 0.5})
                     ])
                 ])}),
-                m.layout.horizontal({}, [
+                m.layout.container({}, [
+                m.layout.element({}, [
                     Button.component(this.createButton("Copy Camera Transform", () => this.sendCameraTransformToClipboard())),
                     Button.component(this.createButton("Paste Camera Transform", () => this.setCameraTransformFromClipboard()))
+                ]),
+                m.layout.element({}, [
+                    Button.component(this.createButton("Reset Camera Transform", () => this.resetCameraTransform()))
+                ])
                 ])
             ]);
         }
@@ -78,6 +97,11 @@ define((require) => {
                     console.warn("The clipboard content is not a valid camera transform");
                 }
             });
+        }
+
+        resetCameraTransform(){
+            return this.model.pushFullState(DEFAULT_CAMERA_TRANSFORM)
+            .then(() => m.utils.redraw("Camera transform reset"));
         }
 
         /**

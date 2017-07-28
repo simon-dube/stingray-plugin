@@ -2,7 +2,7 @@
     'use strict';
 
     const m = require('components/mithril-ext');
-    const mathUtil = require('common/math-utils');
+    const mathUtils = require('common/math-utils');
     const engineViewportService = require('services/engine-viewport-service');
     const engineViewport = require("common/engine-viewport");
     const vector = require("common/vector");
@@ -15,6 +15,11 @@
                 Z: 0
             }
             this.rotation = {
+                X: 0,
+                Y: 0,
+                Z: 0
+            }
+            this.rotationDegrees = {
                 X: 0,
                 Y: 0,
                 Z: 0
@@ -37,15 +42,34 @@
                 return state.rotation.invokeMethod("get_EulerXyz", [], {});
             }).then(rotation => {
                 this.rotation = rotation;
+                this.setDegreesRotation(this.rotation);
             });
         }
 
+        setRadiansRotation(vector){
+            this.rotation.X = mathUtils.toRadians(vector.X);
+            this.rotation.Y = mathUtils.toRadians(vector.Y);
+            this.rotation.Z = mathUtils.toRadians(vector.Z);
+        }
+
+        setDegreesRotation(vector){
+            this.rotationDegrees.X = mathUtils.toDegrees(vector.X);
+            this.rotationDegrees.Y = mathUtils.toDegrees(vector.Y);
+            this.rotationDegrees.Z = mathUtils.toDegrees(vector.Z);
+        }
+
         pushState(changed){
-            return engineViewportService.getActiveCameraForViewport("LevelEditingViewport1")
-            .then(camera => {
-                this.state[changed] = this[changed];
-                camera.invokeMethod("SetState", [this.state], {});
+            return Promise.resolve()
+            .then(() => {
+                if(changed.indexOf("rotation") >= 0){
+                    this.setRadiansRotation(this.rotationDegrees);
+                    this.state.rotation.invokeMethod("set_EulerXyz", [this.rotation], {});
+                }else{
+                    this.state[changed] = this[changed];
+                }
             })
+            .then(() => engineViewportService.getActiveCameraForViewport("LevelEditingViewport1"))
+            .then(camera => camera.invokeMethod("SetState", [this.state], {}));
         }
 
         pushFullState(state){
@@ -65,6 +89,21 @@
         }
    
         propertyModel(path, pathExtension, onSet) {
+            function setPropertyModelValue(path, value, cameraTransformModel){
+                if(path.indexOf("rotation") >= 0){
+                    if(value < -180){
+                        value = 360 + value;
+                    }
+                    else if(value > 180){
+                        value = value - 360;
+                    }
+                    _.set(cameraTransformModel, path, value%360);
+                }
+                else{
+                    _.set(cameraTransformModel, path, value);                        
+                }
+            }
+
             let cameraTransformModel = this;
             let model = function (value) {
                 // value = _.isFinite(value) ? mathUtil.numberTruncate(value, 4) : value;
@@ -80,7 +119,7 @@
                         });
                     }
                     else {
-                        _.set(cameraTransformModel, path, value);
+                        setPropertyModelValue(path, value, cameraTransformModel);
                         cameraTransformModel.pushState(path);
                         
                         if (onSet) {
@@ -110,7 +149,7 @@
                     });
                 }
                 else {
-                    _.set(cameraTransformModel, path, newValue);
+                    setPropertyModelValue(path, newValue, cameraTransformModel);
                     cameraTransformModel.pushState(path);
                     if (onSet) {
                         onSet(newValue);
@@ -130,7 +169,7 @@
                     });
                 }
                 else {
-                    _.set(cameraTransformModel, path, newValue);
+                    setPropertyModelValue(path, newValue, cameraTransformModel);
                     cameraTransformModel.pushState(path);
                     
                     if (onSet) {
